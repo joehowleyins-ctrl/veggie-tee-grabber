@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>Veggie Tee Time Grabber</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --black:#0a0a0a; --off-black:#111111; --surface:#161616; --surface2:#1e1e1e;
+  --border:rgba(255,255,255,0.08); --border-hi:rgba(255,255,255,0.18);
+  --white:#ffffff; --off-white:#f0f0f0; --muted:rgba(255,255,255,0.45);
+  --lime:#c6f135; --lime-dim:rgba(198,241,53,0.12); --lime-glow:rgba(198,241,53,0.25);
+  --red:#ff3b3b; --amber:#f5a623; --blue:#4a9eff;
+  --font-display:'Barlow Condensed',sans-serif; --font-body:'Barlow',sans-serif;
+  --ease-out:cubic-bezier(0.16,1,0.3,1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:var(--font-body);background:var(--black);color:var(--white);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:var(--black);} ::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:2px;}
+body::after{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.4;}
+
+@keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes sheetUp{from{opacity:0.6;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse-lime{0%,100%{box-shadow:0 0 0 0 rgba(198,241,53,0)}60%{box-shadow:0 0 0 4px rgba(198,241,53,0.15)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* HEADER */
+header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 2.5rem;height:64px;display:flex;align-items:center;justify-content:space-between;animation:slideDown 0.5s var(--ease-out) both;}
+.logo-wrap{display:flex;flex-direction:column;gap:1px;}
+.logo-eyebrow{font-family:var(--font-display);font-size:0.65rem;font-weight:600;letter-spacing:0.25em;text-transform:uppercase;color:var(--lime);line-height:1;}
+.logo-name{font-family:var(--font-display);font-size:1.45rem;font-weight:900;text-transform:uppercase;letter-spacing:0.04em;color:var(--white);line-height:1;}
+.logo-name em{color:var(--lime);font-style:normal;}
+.header-right{display:flex;gap:0.5rem;align-items:center;}
+
+/* Connection status indicator */
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background 0.3s;flex-shrink:0;}
+.conn-dot.live{background:var(--lime);animation:blink 2s ease infinite;}
+.conn-dot.error{background:var(--red);}
+
+/* BUTTONS */
+.btn{font-family:var(--font-display);font-size:0.8rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;padding:0.6rem 1.4rem;border:none;border-radius:0;cursor:pointer;transition:all 0.18s ease;white-space:nowrap;}
+.btn-ghost{background:transparent;border:1px solid var(--border-hi);color:var(--off-white);}
+.btn-ghost:hover{border-color:var(--white);color:var(--white);background:rgba(255,255,255,0.04);}
+.btn-lime{background:var(--lime);color:var(--black);}
+.btn-lime:hover{background:#d4ff3a;transform:translateY(-1px);box-shadow:0 6px 24px rgba(198,241,53,0.3);}
+.btn-lime:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none;}
+.btn-dark{background:var(--surface2);color:var(--white);border:1px solid var(--border);}
+.btn-dark:hover{background:var(--surface);border-color:var(--border-hi);}
+
+/* HERO BAND */
+.hero-band{background:var(--surface);border-bottom:1px solid var(--border);padding:1.6rem 2.5rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;animation:slideDown 0.5s 0.08s var(--ease-out) both;overflow:hidden;position:relative;}
+.hero-band::before{content:'VEGGIES';position:absolute;right:-1rem;top:50%;transform:translateY(-50%);font-family:var(--font-display);font-size:7rem;font-weight:900;letter-spacing:-0.02em;text-transform:uppercase;color:rgba(255,255,255,0.025);line-height:1;pointer-events:none;user-select:none;}
+.hero-tagline{font-family:var(--font-display);font-size:1rem;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);}
+.hero-tagline strong{color:var(--white);font-weight:700;}
+.season-chip{display:flex;align-items:center;gap:0.6rem;background:var(--lime-dim);border:1px solid rgba(198,241,53,0.3);padding:0.45rem 1rem;flex-shrink:0;}
+.season-chip span{font-family:var(--font-display);font-size:0.7rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--lime);}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:1fr 300px;gap:0;min-height:calc(100vh - 64px - 64px);animation:fadeIn 0.4s 0.15s ease both;}
+.feed-col{border-right:1px solid var(--border);padding:2rem 2.5rem 4rem;}
+.sidebar-col{padding:2rem 1.8rem 4rem;background:var(--off-black);}
+
+.sec-label{font-family:var(--font-display);font-size:0.65rem;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:var(--muted);margin-bottom:1.2rem;display:flex;align-items:center;gap:0.8rem;}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.sec-label .pill{background:var(--lime);color:var(--black);font-size:0.55rem;padding:0.1rem 0.4rem;font-weight:800;letter-spacing:0.1em;}
+
+/* CALENDAR */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.9rem;}
+.cal-arrow{background:var(--surface);border:1px solid var(--border);color:var(--white);width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1.1rem;transition:all 0.15s;border-radius:0;}
+.cal-arrow:hover{background:var(--surface2);border-color:var(--border-hi);}
+.cal-range{font-family:var(--font-display);font-size:0.78rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);}
+.cal-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:2rem;}
+.cal-cell{background:var(--surface);border:1px solid var(--border);padding:0.7rem 0.25rem 0.6rem;text-align:center;cursor:pointer;transition:all 0.15s;position:relative;overflow:hidden;}
+.cal-cell::before{content:'';position:absolute;inset:0;background:var(--lime);transform:scaleY(0);transform-origin:bottom;transition:transform 0.2s var(--ease-out);z-index:0;}
+.cal-cell:hover::before{transform:scaleY(0.04);}
+.cal-cell.active{border-color:var(--lime);background:var(--lime-dim);}
+.cal-cell.today{border-color:rgba(255,255,255,0.3);}
+.cal-cell>*{position:relative;z-index:1;}
+.cal-dname{font-family:var(--font-display);font-size:0.58rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:0.2rem;}
+.cal-dnum{font-family:var(--font-display);font-size:1.35rem;font-weight:800;color:var(--white);line-height:1;margin-bottom:0.2rem;}
+.cal-cell.active .cal-dnum{color:var(--lime);}
+.cal-icon{font-size:0.95rem;margin-bottom:0.15rem;}
+.cal-temp{font-family:var(--font-display);font-size:0.58rem;font-weight:600;color:var(--muted);margin-bottom:0.25rem;}
+.cal-dots{display:flex;gap:2px;justify-content:center;min-height:6px;}
+.cal-dot{width:5px;height:5px;border-radius:0;}
+.dot-open{background:var(--lime);}
+.dot-full{background:rgba(255,255,255,0.3);}
+.dot-none{background:rgba(255,255,255,0.08);}
+.today-pip{position:absolute;top:4px;right:5px;width:4px;height:4px;background:var(--lime);border-radius:50%;}
+
+/* TEE CARDS */
+.tee-list{display:flex;flex-direction:column;gap:0.75rem;}
+.empty-state{padding:3.5rem 1.5rem;text-align:center;border:1px dashed var(--border-hi);}
+.empty-big{font-family:var(--font-display);font-size:3rem;font-weight:900;text-transform:uppercase;letter-spacing:0.02em;color:rgba(255,255,255,0.06);line-height:1;margin-bottom:0.75rem;}
+.empty-sub{font-family:var(--font-display);font-size:0.85rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+
+/* Loading spinner */
+.loading-state{padding:3rem;text-align:center;}
+.spinner{width:32px;height:32px;border:2px solid var(--border);border-top-color:var(--lime);border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 1rem;}
+.loading-text{font-family:var(--font-display);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);}
+
+.tee-card{background:var(--surface);border:1px solid var(--border);transition:all 0.2s var(--ease-out);position:relative;overflow:hidden;}
+.tee-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--border);transition:background 0.2s;}
+.tee-card:hover{border-color:var(--border-hi);transform:translateX(2px);}
+.tee-card:hover::before{background:var(--lime);}
+.tee-card.hot::before{background:var(--lime);}
+.card-top{display:flex;align-items:stretch;border-bottom:1px solid var(--border);}
+.card-date{background:var(--surface2);padding:1rem 1.1rem;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:68px;border-right:1px solid var(--border);flex-shrink:0;}
+.card-date .d-day{font-family:var(--font-display);font-size:0.6rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);}
+.card-date .d-num{font-family:var(--font-display);font-size:2.2rem;font-weight:900;color:var(--white);line-height:1;}
+.card-date .d-month{font-family:var(--font-display);font-size:0.6rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);}
+.card-info{flex:1;padding:0.85rem 1rem;display:flex;flex-direction:column;justify-content:center;gap:0.35rem;}
+.card-course{font-family:var(--font-display);font-size:1.1rem;font-weight:800;text-transform:uppercase;letter-spacing:0.03em;color:var(--white);line-height:1.1;}
+.card-meta{display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;}
+.card-time{font-family:var(--font-display);font-size:0.72rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--lime);background:var(--lime-dim);border:1px solid rgba(198,241,53,0.25);padding:0.18rem 0.6rem;}
+.card-format{font-family:var(--font-display);font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.card-weather{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.7rem 1rem;gap:0.15rem;min-width:88px;border-left:1px solid var(--border);flex-shrink:0;}
+.c-icon{font-size:1.5rem;} .c-temp{font-family:var(--font-display);font-size:1.1rem;font-weight:800;color:var(--white);}
+.c-desc{font-family:var(--font-display);font-size:0.55rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.c-demand{font-family:var(--font-display);font-size:0.52rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:0.14rem 0.45rem;margin-top:0.1rem;}
+.d-hot{background:rgba(255,59,59,0.15);color:#ff6b6b;} .d-warm{background:rgba(245,166,35,0.15);color:#f5a623;} .d-mild{background:rgba(74,158,255,0.15);color:#4a9eff;} .d-low{background:rgba(255,255,255,0.08);color:var(--muted);}
+.card-slots{padding:0.9rem 1rem 1rem;}
+.slots-hd{font-family:var(--font-display);font-size:0.58rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem;}
+.slots-row{display:flex;gap:0.45rem;flex-wrap:wrap;}
+.slot{display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0.75rem;font-family:var(--font-display);font-size:0.78rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border:1px solid;cursor:pointer;transition:all 0.15s;white-space:nowrap;border-radius:0;}
+.slot-taken{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.1);color:rgba(255,255,255,0.55);cursor:default;}
+.slot-open{background:var(--lime-dim);border-color:rgba(198,241,53,0.4);color:var(--lime);animation:pulse-lime 2.8s ease infinite;}
+.slot-open:hover{background:rgba(198,241,53,0.2);border-color:var(--lime);animation:none;box-shadow:0 0 12px rgba(198,241,53,0.2);}
+.card-foot{padding:0.6rem 1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:0.5rem;flex-wrap:wrap;}
+.book-link{font-family:var(--font-display);font-size:0.68rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--lime);text-decoration:none;border-bottom:1px solid rgba(198,241,53,0.35);padding-bottom:1px;transition:all 0.15s;}
+.book-link:hover{border-color:var(--lime);}
+.spots-left{font-family:var(--font-display);font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.spots-left strong{color:var(--lime);}
+.hot-flag{position:absolute;top:0;right:0;background:var(--lime);color:var(--black);font-family:var(--font-display);font-size:0.5rem;font-weight:900;letter-spacing:0.15em;text-transform:uppercase;padding:0.22rem 0.6rem;}
+.delete-btn{background:none;border:none;color:rgba(255,255,255,0.2);font-size:0.75rem;cursor:pointer;padding:0.2rem 0.4rem;transition:color 0.15s;font-family:var(--font-display);font-weight:700;letter-spacing:0.05em;}
+.delete-btn:hover{color:var(--red);}
+
+.legend{display:flex;flex-wrap:wrap;gap:1rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);}
+.legend-item{display:flex;align-items:center;gap:0.4rem;font-family:var(--font-display);font-size:0.6rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.leg-dot{width:6px;height:6px;border-radius:0;}
+
+/* SIDEBAR */
+.sb-section{margin-bottom:2rem;}
+.course-group{border:1px solid var(--border);margin-bottom:0.5rem;overflow:hidden;}
+.cg-header{display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;cursor:pointer;transition:background 0.15s;background:var(--surface);}
+.cg-header:hover{background:var(--surface2);}
+.cg-name{font-family:var(--font-display);font-size:0.9rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--white);}
+.cg-sub{font-family:var(--font-display);font-size:0.58rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-top:1px;}
+.cg-right{display:flex;align-items:center;gap:0.5rem;}
+.cg-toggle{color:var(--muted);font-size:0.75rem;transition:transform 0.22s;}
+.cg-toggle.open{transform:rotate(180deg);}
+.cg-courses{max-height:0;overflow:hidden;transition:max-height 0.35s var(--ease-out);background:var(--off-black);}
+.cg-courses.open{max-height:700px;}
+.cg-item{display:flex;align-items:center;justify-content:space-between;padding:0.55rem 1rem 0.55rem 1.3rem;border-top:1px solid var(--border);border-left:2px solid transparent;transition:all 0.15s;}
+.cg-item:hover{border-left-color:var(--lime);background:rgba(255,255,255,0.02);}
+.cg-item-name{font-family:var(--font-display);font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--off-white);}
+.cg-item-dist{font-family:var(--font-display);font-size:0.56rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.mini-book{font-family:var(--font-display);font-size:0.6rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--lime);text-decoration:none;opacity:0.7;transition:opacity 0.15s;}
+.mini-book:hover{opacity:1;}
+.solo-course{display:flex;flex-direction:column;gap:0.3rem;padding:0.75rem 1rem;border:1px solid var(--border);background:var(--surface);transition:border-color 0.15s;}
+.solo-course:hover{border-color:var(--border-hi);}
+.solo-course-name{font-family:var(--font-display);font-size:0.88rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--white);}
+.solo-meta{display:flex;justify-content:space-between;align-items:center;}
+.solo-dist{font-family:var(--font-display);font-size:0.58rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
+.solo-stars{font-size:0.6rem;color:var(--lime);opacity:0.7;}
+.solo-book{display:inline-block;margin-top:0.2rem;font-family:var(--font-display);font-size:0.62rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--lime);text-decoration:none;border-bottom:1px solid rgba(198,241,53,0.3);padding-bottom:1px;transition:border-color 0.15s;}
+.solo-book:hover{border-color:var(--lime);}
+
+.crew-row{display:flex;align-items:center;gap:0.7rem;padding:0.55rem 0;border-bottom:1px solid var(--border);}
+.crew-row:last-child{border-bottom:none;}
+.crew-av{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:0.62rem;font-weight:800;color:var(--black);flex-shrink:0;}
+.crew-name{font-family:var(--font-display);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--white);flex:1;}
+.crew-hdcp{font-family:var(--font-display);font-size:0.75rem;font-weight:700;color:var(--muted);width:28px;text-align:right;flex-shrink:0;}
+.crew-stat{font-family:var(--font-display);font-size:0.55rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;flex-shrink:0;padding:0.12rem 0.4rem;}
+.st-in{background:rgba(198,241,53,0.12);color:var(--lime);} .st-avail{color:var(--muted);}
+.hdcp-note{font-family:var(--font-display);font-size:0.55rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);opacity:0.5;margin-top:0.7rem;}
+
+/* MODALS */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center;}
+.overlay.open{display:flex;animation:fadeIn 0.2s ease;}
+.modal{background:var(--surface);border:1px solid var(--border-hi);width:440px;max-width:95vw;max-height:88vh;overflow-y:auto;animation:slideUp 0.28s var(--ease-out);}
+.modal-head{padding:1.5rem 1.6rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;}
+.modal-head h2{font-family:var(--font-display);font-size:1.6rem;font-weight:900;text-transform:uppercase;letter-spacing:0.03em;line-height:1;}
+.modal-head h2 em{color:var(--lime);font-style:normal;}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:0 0.2rem;transition:color 0.15s;}
+.modal-close:hover{color:var(--white);}
+.modal-sub{font-family:var(--font-display);font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:0.2rem;}
+.modal-body{padding:1.2rem 1.6rem 1.6rem;}
+.fg{margin-bottom:0.9rem;}
+.fg label{display:block;font-family:var(--font-display);font-size:0.62rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-bottom:0.35rem;}
+.fg input,.fg select{width:100%;background:var(--off-black);border:1px solid var(--border);color:var(--white);font-family:var(--font-display);font-size:0.9rem;font-weight:600;letter-spacing:0.04em;padding:0.6rem 0.85rem;outline:none;transition:border-color 0.15s;border-radius:0;-webkit-appearance:none;}
+.fg input:focus,.fg select:focus{border-color:var(--lime);}
+.fg select option{background:var(--off-black);}
+.player-grid{display:grid;grid-template-columns:1fr 1fr;gap:0.32rem;margin-top:0.28rem;}
+.p-check{display:flex;align-items:center;gap:0.45rem;padding:0.42rem 0.65rem;background:var(--off-black);border:1px solid var(--border);cursor:pointer;transition:all 0.15s;}
+.p-check:hover{border-color:var(--border-hi);}
+.p-check input[type=checkbox]{accent-color:var(--lime);cursor:pointer;}
+.p-check-name{font-family:var(--font-display);font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--off-white);flex:1;}
+.p-check-hdcp{font-family:var(--font-display);font-size:0.6rem;font-weight:600;color:var(--muted);}
+.modal-foot{display:flex;gap:0.5rem;padding-top:0.5rem;}
+.modal-foot .btn{flex:1;justify-content:center;text-align:center;padding:0.75rem;font-size:0.8rem;}
+
+.claim-list{display:flex;flex-direction:column;gap:0.3rem;max-height:300px;overflow-y:auto;}
+.claim-row{display:flex;align-items:center;gap:0.8rem;padding:0.6rem 0.85rem;background:var(--off-black);border:1px solid var(--border);cursor:pointer;transition:all 0.15s;text-align:left;width:100%;color:var(--white);font-family:var(--font-display);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;border-radius:0;}
+.claim-row:hover{border-color:var(--lime);background:var(--lime-dim);color:var(--lime);}
+.claim-av{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:0.58rem;font-weight:800;color:var(--black);flex-shrink:0;}
+.claim-hdcp{margin-left:auto;font-size:0.65rem;color:var(--muted);font-weight:600;}
+
+.spot-item{padding:0.65rem 0;border-bottom:1px solid var(--border);}
+.spot-item:last-child{border-bottom:none;}
+.spot-course{font-family:var(--font-display);font-size:0.9rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:var(--lime);}
+.spot-meta{font-family:var(--font-display);font-size:0.62rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:0.15rem;}
+.spot-book{display:inline-block;margin-top:0.3rem;font-family:var(--font-display);font-size:0.62rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--lime);text-decoration:none;border:1px solid rgba(198,241,53,0.35);padding:0.18rem 0.55rem;transition:all 0.15s;}
+.spot-book:hover{background:var(--lime-dim);border-color:var(--lime);}
+.empty-spots{font-family:var(--font-display);font-size:0.82rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--white);color:var(--black);font-family:var(--font-display);font-size:0.78rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:0.75rem 1.4rem;z-index:1000;opacity:0;transition:all 0.35s var(--ease-out);white-space:nowrap;max-width:90vw;}
+.toast a{color:var(--black)!important;text-decoration:underline;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .feed-col{border-right:none;border-bottom:1px solid var(--border);padding:1.5rem 1.5rem 2.5rem;}
+  .sidebar-col{padding:1.5rem;}
+}
+@media(max-width:600px){
+  header{padding:0 1.1rem;height:56px;}
+  .logo-name{font-size:1.2rem;} .logo-eyebrow{font-size:0.55rem;}
+  .header-right{gap:0.35rem;}
+  .btn{padding:0.5rem 0.9rem;font-size:0.7rem;}
+  .hero-band{padding:1rem 1.1rem;}
+  .hero-band::before{font-size:4rem;}
+  .hero-tagline{font-size:0.82rem;}
+  .feed-col{padding:1.2rem 1rem 2rem;} .sidebar-col{padding:1.2rem 1rem 2rem;}
+  .cal-strip{gap:2px;}
+  .cal-cell{padding:0.5rem 0.15rem 0.45rem;}
+  .cal-dname{font-size:0.5rem;} .cal-dnum{font-size:1.1rem;} .cal-icon{font-size:0.8rem;} .cal-temp{font-size:0.5rem;}
+  .card-date{min-width:58px;padding:0.8rem 0.7rem;} .card-date .d-num{font-size:1.8rem;}
+  .card-info{padding:0.7rem 0.75rem;} .card-course{font-size:0.92rem;}
+  .card-weather{min-width:72px;padding:0.6rem 0.65rem;} .c-temp{font-size:0.95rem;}
+  .card-slots{padding:0.7rem 0.8rem 0.85rem;}
+  .slot{font-size:0.7rem;padding:0.35rem 0.6rem;}
+  .card-foot{padding:0.55rem 0.8rem;flex-direction:column;align-items:flex-start;gap:0.3rem;}
+  .overlay{align-items:flex-end;}
+  .modal{width:100%;max-width:100%;border-top:2px solid var(--lime);max-height:92vh;}
+  @keyframes slideUp{from{opacity:0.5;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}
+  .fg input,.fg select{font-size:16px;}
+  .modal-foot{flex-direction:column-reverse;}
+  .player-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-wrap">
+    <span class="logo-eyebrow">Veggies · Montgomery County</span>
+    <span class="logo-name">Veggie <em>Tee</em> Grabber</span>
+  </div>
+  <div class="header-right">
+    <div class="conn-dot" id="connDot" title="Database connection"></div>
+    <button class="btn btn-ghost" onclick="openAddModal()">+ Post Time</button>
+    <button class="btn btn-lime"  onclick="openMySpots()">My Spots</button>
+  </div>
+</header>
+
+<div class="hero-band">
+  <p class="hero-tagline"><strong>Claim your tee time.</strong> First come, first serve.</p>
+  <div class="season-chip"><span>Spring 2026</span></div>
+</div>
+
+<div class="layout">
+  <div class="feed-col">
+    <div class="cal-nav">
+      <button class="cal-arrow" onclick="shiftWeek(-1)">&#8249;</button>
+      <span class="cal-range" id="calRange"></span>
+      <button class="cal-arrow" onclick="shiftWeek(1)">&#8250;</button>
+    </div>
+    <div class="cal-strip" id="calStrip"></div>
+    <div class="sec-label" id="feedLabel">This Week</div>
+    <div class="tee-list" id="teeList">
+      <div class="loading-state"><div class="spinner"></div><div class="loading-text">Loading tee times...</div></div>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="leg-dot" style="background:var(--lime)"></div>Open slot</div>
+      <div class="legend-item"><div class="leg-dot" style="background:rgba(255,255,255,0.25)"></div>Booked</div>
+      <div class="legend-item"><div class="leg-dot" style="background:#ff6b6b"></div>High demand</div>
+      <div class="legend-item"><div class="leg-dot" style="background:#f5a623"></div>Moderate</div>
+      <div class="legend-item"><div class="leg-dot" style="background:#4a9eff"></div>Mild</div>
+      <div class="legend-item"><div class="leg-dot" style="background:var(--muted)"></div>Low demand</div>
+    </div>
+  </div>
+
+  <div class="sidebar-col">
+    <div class="sb-section">
+      <div class="sec-label">Courses</div>
+      <div class="course-group">
+        <div class="cg-header" onclick="toggleMCG()">
+          <div><div class="cg-name">MCG Network</div><div class="cg-sub">9 courses · Montgomery Co.</div></div>
+          <div class="cg-right">
+            <a href="https://fox.tenfore.golf/mcggolf" target="_blank" onclick="event.stopPropagation()" class="mini-book" style="border-bottom:1px solid rgba(198,241,53,0.35);padding-bottom:1px;text-decoration:none;">Book ↗</a>
+            <span class="cg-toggle" id="mcgToggle">▾</span>
+          </div>
+        </div>
+        <div class="cg-courses" id="mcgCourses">
+          <div class="cg-item"><div><div class="cg-item-name">Falls Road</div><div class="cg-item-dist">Rockville · 9 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Hampshire Greens</div><div class="cg-item-dist">Silver Spring · 18 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Laytonsville</div><div class="cg-item-dist">Laytonsville · 18 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Little Bennett</div><div class="cg-item-dist">Clarksburg · 18 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Needwood</div><div class="cg-item-dist">Derwood · 18 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Northwest</div><div class="cg-item-dist">Germantown · 18 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Golf at The Crossvines</div><div class="cg-item-dist">Poolesville · 18 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Rattlewood</div><div class="cg-item-dist">Mt. Airy · 18 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+          <div class="cg-item"><div><div class="cg-item-name">Sligo Creek</div><div class="cg-item-dist">Silver Spring · 9 holes</div></div><a href="https://fox.tenfore.golf/mcggolf" target="_blank" class="mini-book">Book ↗</a></div>
+        </div>
+      </div>
+      <div class="solo-course">
+        <div class="solo-course-name">Blue Mash</div>
+        <div class="solo-meta"><span class="solo-dist">Laytonsville · 22 mi</span><span class="solo-stars">★★★★★</span></div>
+        <a href="https://www.bluemash.com" target="_blank" class="solo-book">⛳ Book Now ↗</a>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sec-label">The Veggies <span class="pill">10</span></div>
+      <div id="crewList"></div>
+      <div class="hdcp-note">USGA Handicap Index</div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>Post a <em>Tee Time</em></h2><p class="modal-sub">Open slots are first come, first serve</p></div>
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label>Course</label>
+        <select id="mCourse">
+          <optgroup label="MCG Golf Network">
+            <option value="Falls Road (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Falls Road (MCG)</option>
+            <option value="Hampshire Greens (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Hampshire Greens (MCG)</option>
+            <option value="Laytonsville (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Laytonsville (MCG)</option>
+            <option value="Little Bennett (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Little Bennett (MCG)</option>
+            <option value="Needwood (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Needwood (MCG)</option>
+            <option value="Northwest (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Northwest (MCG)</option>
+            <option value="Golf at The Crossvines (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Golf at The Crossvines (MCG)</option>
+            <option value="Rattlewood (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Rattlewood (MCG)</option>
+            <option value="Sligo Creek (MCG)" data-url="https://fox.tenfore.golf/mcggolf">Sligo Creek (MCG)</option>
+          </optgroup>
+          <optgroup label="Other Courses">
+            <option value="Blue Mash Golf Course" data-url="https://www.bluemash.com">Blue Mash Golf Course</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="fg"><label>Date</label><input type="date" id="mDate"></div>
+      <div class="fg"><label>Tee Time Window</label><input type="text" id="mTime" placeholder="e.g. 12:30 – 2:00 PM"></div>
+      <div class="fg"><label>Format</label>
+        <select id="mFormat">
+          <option>18 Holes · Cart</option><option>18 Holes · Walking</option>
+          <option>9 Holes · Walking</option><option>9 Holes · Cart</option>
+        </select>
+      </div>
+      <div class="fg"><label>Already Confirmed (optional)</label><div class="player-grid" id="addChecks"></div></div>
+      <div class="modal-foot">
+        <button class="btn btn-dark" onclick="closeAddModal()">Cancel</button>
+        <button class="btn btn-lime" id="submitBtn" onclick="submitTime()">Post Tee Time</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CLAIM MODAL -->
+<div class="overlay" id="claimModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>Claim <em>Your Spot</em></h2><p class="modal-sub">Pick your name, then complete the booking</p></div>
+      <button class="modal-close" onclick="closeClaimModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="claim-list" id="claimList"></div>
+      <div class="modal-foot" style="margin-top:1rem;"><button class="btn btn-dark" onclick="closeClaimModal()">Cancel</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MY SPOTS MODAL -->
+<div class="overlay" id="spotsModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>My <em>Spots</em></h2><p class="modal-sub">Your reserved tee times</p></div>
+      <button class="modal-close" onclick="closeSpotsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="spotsContent"></div>
+      <div class="modal-foot" style="margin-top:1rem;"><button class="btn btn-dark" onclick="closeSpotsModal()">Close</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Supabase ──
+const { createClient } = supabase;
+const sb = createClient(
+  'https://nphctexwxhgylvntwdoj.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5waGN0ZXh3eGhneWx2bnR3ZG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NDc0NjgsImV4cCI6MjA5MDEyMzQ2OH0.h7FmoQrpQiXWvfwjJXwcXb-3f5o-ZSCUCW0f4dhw4CQ'
+);
+
+// ── Crew ──
+const CREW = [
+  {name:"Joe Howley",     init:"JH",hdcp:10.8,color:"#c6f135"},
+  {name:"Philip Dao",     init:"PD",hdcp:22.1,color:"#6aaa7e"},
+  {name:"CJ Kozorosky",   init:"CJ",hdcp:15.1,color:"#4a9eff"},
+  {name:"Joe Reilly",     init:"JR",hdcp: 0.9,color:"#b388ff"},
+  {name:"Mike Rosenbaum", init:"MR",hdcp: 9.1,color:"#ff8a65"},
+  {name:"Jack Sebeck",    init:"JS",hdcp: 8.5,color:"#4dd0e1"},
+  {name:"Tristan Sinha",  init:"TS",hdcp:12.3,color:"#ffcc02"},
+  {name:"Steve Stanislav",init:"SS",hdcp: 6.8,color:"#a5d6a7"},
+  {name:"Kyle Turner",    init:"KT",hdcp:14.7,color:"#ef9a9a"},
+  {name:"Casey Weiskoph", init:"CW",hdcp:10.5,color:"#80cbc4"},
+];
+
+const COURSE_URLS = {
+  "Falls Road (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Hampshire Greens (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Laytonsville (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Little Bennett (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Needwood (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Northwest (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Golf at The Crossvines (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Rattlewood (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Sligo Creek (MCG)":"https://fox.tenfore.golf/mcggolf",
+  "Blue Mash Golf Course":"https://www.bluemash.com",
+};
+
+const DAYS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MFULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+const TODAY = new Date(); TODAY.setHours(0,0,0,0);
+let weekOffset = 0;
+let selectedDate = null;
+
+// Local cache of db data
+let dbTeeTimes = [];   // [{id, course, date, time_window, format, book_url}]
+let dbBookings = [];   // [{id, tee_time_id, player_name, player_init, player_color}]
+let dbWeather  = {};   // {date_key: {icon,temp,description,demand_class,demand_label}}
+let mySpots    = {};   // session-only: name -> [{...}]
+
+function dateKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+function parseDate(str){ const d=new Date(str+'T12:00:00'); return d; }
+function short(n){ const p=n.split(' '); return p[0]+' '+p[1].charAt(0)+'.'; }
+function av(init,color,size=15){
+  return `<span style="width:${size}px;height:${size}px;background:${color};display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:${Math.round(size*0.38)}px;font-weight:800;color:#0a0a0a;flex-shrink:0;">${init}</span>`;
+}
+
+// ── Weather (seeded deterministic fallback + cache) ──
+function weatherFallback(dk){
+  let h=0; for(let c of dk) h=(h*31+c.charCodeAt(0))&0xffff;
+  const opts=[
+    {icon:'☀️',temp:72+(h%12),description:'Sunny',    demand_class:'d-hot', demand_label:'High Demand'},
+    {icon:'🌤️',temp:68+(h%8), description:'Mostly Sun',demand_class:'d-hot', demand_label:'High Demand'},
+    {icon:'⛅',temp:63+(h%10),description:'P. Cloudy', demand_class:'d-warm',demand_label:'Moderate'},
+    {icon:'🌥️',temp:58+(h%8), description:'Cloudy',    demand_class:'d-mild',demand_label:'Mild'},
+    {icon:'🌧️',temp:52+(h%7), description:'Rainy',     demand_class:'d-low', demand_label:'Low Demand'},
+    {icon:'⛈️',temp:50+(h%5), description:'Storms',    demand_class:'d-low', demand_label:'Low Demand'},
+  ];
+  return opts[h%opts.length];
+}
+
+function getWeather(dk){ return dbWeather[dk] || weatherFallback(dk); }
+
+async function loadWeatherForWeek(){
+  const ws = weekStart();
+  const keys = [];
+  for(let i=0;i<7;i++){ const d=new Date(ws); d.setDate(ws.getDate()+i); keys.push(dateKey(d)); }
+  const missing = keys.filter(k=>!dbWeather[k]);
+  if(missing.length===0) return;
+
+  // Try to load from cache table
+  const {data} = await sb.from('weather_cache').select('*').in('date_key',missing);
+  if(data) data.forEach(row=>{ dbWeather[row.date_key]=row; });
+
+  // For any still missing, write fallback to cache
+  const stillMissing = missing.filter(k=>!dbWeather[k]);
+  for(const k of stillMissing){
+    const w=weatherFallback(k);
+    dbWeather[k]=w;
+    await sb.from('weather_cache').upsert({date_key:k,...w,updated_at:new Date().toISOString()});
+  }
+}
+
+// ── Load all data ──
+async function loadAll(){
+  setConnStatus('loading');
+  try {
+    const [{data:tt,error:e1},{data:bk,error:e2}] = await Promise.all([
+      sb.from('tee_times').select('*').order('date').order('time_window'),
+      sb.from('bookings').select('*'),
+    ]);
+    if(e1||e2) throw new Error(e1?.message||e2?.message);
+    dbTeeTimes = tt||[];
+    dbBookings = bk||[];
+    await loadWeatherForWeek();
+    setConnStatus('live');
+    renderCal();
+    renderFeed();
+    renderCrew();
+  } catch(err){
+    setConnStatus('error');
+    showToast('DB ERROR: '+err.message);
+    renderCal();
+    renderFeed();
+    renderCrew();
+  }
+}
+
+function setConnStatus(s){
+  const dot=document.getElementById('connDot');
+  dot.className='conn-dot';
+  if(s==='live') dot.classList.add('live');
+  if(s==='error') dot.classList.add('error');
+  dot.title = s==='live'?'Live — real-time sync on':s==='error'?'Connection error':'Connecting...';
+}
+
+// ── Real-time subscriptions ──
+function subscribeRealtime(){
+  sb.channel('veggie-realtime')
+    .on('postgres_changes',{event:'*',schema:'public',table:'tee_times'},async()=>{ await reloadData(); })
+    .on('postgres_changes',{event:'*',schema:'public',table:'bookings'}, async()=>{ await reloadData(); })
+    .subscribe(status=>{
+      if(status==='SUBSCRIBED') setConnStatus('live');
+      if(status==='CHANNEL_ERROR') setConnStatus('error');
+    });
+}
+
+async function reloadData(){
+  const [{data:tt},{data:bk}] = await Promise.all([
+    sb.from('tee_times').select('*').order('date').order('time_window'),
+    sb.from('bookings').select('*'),
+  ]);
+  dbTeeTimes=tt||[];
+  dbBookings=bk||[];
+  renderCal();
+  renderFeed();
+  renderCrew();
+}
+
+// ── Helpers ──
+function bookingsFor(ttId){ return dbBookings.filter(b=>b.tee_time_id===ttId); }
+function openSlotsFor(ttId){ return 4-bookingsFor(ttId).length; }
+
+// ── Render Crew ──
+function renderCrew(){
+  document.getElementById('crewList').innerHTML = CREW.map(p=>{
+    const cnt = dbBookings.filter(b=>b.player_init===p.init).length;
+    return `<div class="crew-row">
+      <div class="crew-av" style="background:${p.color};">${p.init}</div>
+      <span class="crew-name">${p.name}</span>
+      <span class="crew-hdcp">${p.hdcp}</span>
+      <span class="crew-stat ${cnt>0?'st-in':'st-avail'}">${cnt>0?`In ${cnt}`:'Open'}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Player checks ──
+document.getElementById('addChecks').innerHTML = CREW.map(p=>
+  `<label class="p-check">
+    <input type="checkbox" value="${p.name}" data-init="${p.init}" data-color="${p.color}">
+    <span class="p-check-name">${p.name.split(' ')[0]}</span>
+    <span class="p-check-hdcp">${p.hdcp}</span>
+  </label>`).join('');
+
+// ── Calendar ──
+function weekStart(){ const d=new Date(TODAY); d.setDate(d.getDate()+weekOffset*7); return d; }
+
+function renderCal(){
+  const strip=document.getElementById('calStrip');
+  const rangeEl=document.getElementById('calRange');
+  const ws=weekStart();
+  const we=new Date(ws); we.setDate(we.getDate()+6);
+  if(ws.getMonth()===we.getMonth()){
+    rangeEl.textContent=`${MFULL[ws.getMonth()]} ${ws.getDate()}–${we.getDate()}, ${ws.getFullYear()}`;
+  } else {
+    rangeEl.textContent=`${MFULL[ws.getMonth()].slice(0,3)} ${ws.getDate()} – ${MFULL[we.getMonth()].slice(0,3)} ${we.getDate()}`;
+  }
+  strip.innerHTML='';
+  for(let i=0;i<7;i++){
+    const d=new Date(ws); d.setDate(ws.getDate()+i);
+    const dk=dateKey(d);
+    const w=getWeather(dk);
+    const isToday=sameDay(d,TODAY);
+    const isActive=selectedDate&&sameDay(d,selectedDate);
+    const dayTimes=dbTeeTimes.filter(t=>t.date===dk);
+    let dots='';
+    if(dayTimes.length===0){ dots=`<div class="cal-dot dot-none"></div>`; }
+    else { dayTimes.forEach(t=>{ dots+=`<div class="cal-dot ${openSlotsFor(t.id)===0?'dot-full':'dot-open'}"></div>`; }); }
+    const cell=document.createElement('div');
+    cell.className='cal-cell'+(isToday?' today':'')+(isActive?' active':'');
+    cell.innerHTML=`${isToday?'<div class="today-pip"></div>':''}
+      <div class="cal-dname">${DAYS[d.getDay()].slice(0,2)}</div>
+      <div class="cal-dnum">${d.getDate()}</div>
+      <div class="cal-icon">${w.icon}</div>
+      <div class="cal-temp">${w.temp}°</div>
+      <div class="cal-dots">${dots}</div>`;
+    cell.onclick=()=>selectDay(d);
+    strip.appendChild(cell);
+  }
+}
+
+function selectDay(d){
+  selectedDate=selectedDate&&sameDay(selectedDate,d)?null:d;
+  renderCal(); renderFeed();
+}
+async function shiftWeek(dir){
+  weekOffset+=dir;
+  await loadWeatherForWeek();
+  renderCal(); renderFeed();
+}
+
+// ── Feed ──
+function renderFeed(){
+  const list=document.getElementById('teeList');
+  const label=document.getElementById('feedLabel');
+  const ws=weekStart();
+  const we=new Date(ws); we.setDate(we.getDate()+6);
+  const wsKey=dateKey(ws), weKey=dateKey(we);
+
+  let filtered;
+  if(selectedDate){
+    const dk=dateKey(selectedDate);
+    filtered=dbTeeTimes.filter(t=>t.date===dk);
+    label.textContent=`${DAYS[selectedDate.getDay()]} ${MONS[selectedDate.getMonth()]} ${selectedDate.getDate()}`;
+  } else {
+    filtered=dbTeeTimes.filter(t=>t.date>=wsKey&&t.date<=weKey);
+    label.textContent='This Week';
+  }
+
+  if(filtered.length===0){
+    list.innerHTML=`<div class="empty-state">
+      <div class="empty-big">No Times<br>Posted</div>
+      <div class="empty-sub">Hit "+ Post Time" to add one</div>
+    </div>`;
+    return;
+  }
+  list.innerHTML=filtered.map(t=>buildCard(t)).join('');
+}
+
+function buildCard(t){
+  const dk=t.date;
+  const d=parseDate(dk);
+  const w=getWeather(dk);
+  const bks=bookingsFor(t.id);
+  const open=4-bks.length;
+  const isHot=w.demand_class==='d-hot'&&open>0;
+
+  const takenH=bks.map(b=>`<div class="slot slot-taken">${av(b.player_init,b.player_color,14)} ${short(b.player_name)}</div>`).join('');
+  const openH=Array(open).fill(0).map(()=>`<div class="slot slot-open" onclick="openClaim('${t.id}')">+ Claim</div>`).join('');
+  const fullLbl=open===0
+    ?'<span style="color:var(--muted);font-family:var(--font-display);font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">Fully Booked</span>'
+    :`<strong>${open} Spot${open!==1?'s':''}</strong> Open`;
+
+  return `<div class="tee-card${isHot?' hot':''}">
+    ${isHot?'<div class="hot-flag">🔥 Hot</div>':''}
+    <div class="card-top">
+      <div class="card-date">
+        <span class="d-day">${DAYS[d.getDay()].slice(0,3)}</span>
+        <span class="d-num">${d.getDate()}</span>
+        <span class="d-month">${MONS[d.getMonth()]}</span>
+      </div>
+      <div class="card-info">
+        <div class="card-course">${t.course}</div>
+        <div class="card-meta">
+          <span class="card-time">${t.time_window}</span>
+          <span class="card-format">${t.format}</span>
+        </div>
+      </div>
+      <div class="card-weather">
+        <div class="c-icon">${w.icon}</div>
+        <div class="c-temp">${w.temp}°</div>
+        <div class="c-desc">${w.description}</div>
+        <div class="c-demand ${w.demand_class}">${w.demand_label}</div>
+      </div>
+    </div>
+    <div class="card-slots">
+      <div class="slots-hd">Player Slots — 4 Total</div>
+      <div class="slots-row">${takenH}${openH}</div>
+    </div>
+    <div class="card-foot">
+      <a href="${t.book_url}" target="_blank" class="book-link">⛳ Book Now ↗</a>
+      <span class="spots-left">${fullLbl}</span>
+      <button class="delete-btn" onclick="deleteTeeTime('${t.id}')" title="Delete this tee time">✕ Delete</button>
+    </div>
+  </div>`;
+}
+
+// ── Delete tee time ──
+async function deleteTeeTime(id){
+  if(!confirm('Remove this tee time for everyone?')) return;
+  const {error}=await sb.from('tee_times').delete().eq('id',id);
+  if(error){ showToast('ERROR: '+error.message); return; }
+  showToast('TEE TIME REMOVED');
+}
+
+// ── Claim ──
+let claimTeeId=null;
+function openClaim(id){
+  claimTeeId=id;
+  const bks=bookingsFor(id);
+  const takenInits=new Set(bks.map(b=>b.player_init));
+  const avail=CREW.filter(p=>!takenInits.has(p.init));
+  document.getElementById('claimList').innerHTML=avail.length
+    ?avail.map(p=>`<button class="claim-row" onclick="confirmClaim('${p.name}','${p.init}','${p.color}')">
+        <div class="claim-av" style="background:${p.color};">${p.init}</div>
+        ${p.name}
+        <span class="claim-hdcp">Hdcp ${p.hdcp}</span>
+      </button>`).join('')
+    :'<p style="font-family:var(--font-display);font-size:0.8rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">All Veggies booked!</p>';
+  document.getElementById('claimModal').classList.add('open');
+}
+function closeClaimModal(){ document.getElementById('claimModal').classList.remove('open'); claimTeeId=null; }
+
+async function confirmClaim(name,init,color){
+  if(!claimTeeId) return;
+  const tt=dbTeeTimes.find(t=>t.id===claimTeeId);
+  if(!tt) return;
+
+  const {error}=await sb.from('bookings').insert({
+    tee_time_id:claimTeeId,
+    player_name:name,
+    player_init:init,
+    player_color:color,
+  });
+  if(error){ showToast('ERROR: '+error.message); return; }
+
+  if(!mySpots[name]) mySpots[name]=[];
+  mySpots[name].push({course:tt.course,date:tt.date,time:tt.time_window,bookUrl:tt.book_url});
+
+  closeClaimModal();
+  showToast(`${short(name)} IS IN — <a href="${tt.book_url}" target="_blank">BOOK NOW ↗</a>`);
+}
+
+// ── Add tee time ──
+function openAddModal(){ document.getElementById('addModal').classList.add('open'); }
+function closeAddModal(){ document.getElementById('addModal').classList.remove('open'); }
+
+async function submitTime(){
+  const sel=document.getElementById('mCourse');
+  const course=sel.value;
+  const bookUrl=sel.options[sel.selectedIndex].dataset.url||'#';
+  const dateVal=document.getElementById('mDate').value;
+  const time=document.getElementById('mTime').value.trim();
+  const format=document.getElementById('mFormat').value;
+  if(!dateVal||!time){ showToast('FILL IN DATE & TIME'); return; }
+
+  const btn=document.getElementById('submitBtn');
+  btn.disabled=true; btn.textContent='Posting...';
+
+  const {data:tt,error:e1}=await sb.from('tee_times').insert({
+    course,date:dateVal,time_window:time,format,book_url:bookUrl
+  }).select().single();
+
+  if(e1){ showToast('ERROR: '+e1.message); btn.disabled=false; btn.textContent='Post Tee Time'; return; }
+
+  // Insert pre-confirmed players
+  const checked=[...document.querySelectorAll('#addChecks input:checked')];
+  if(checked.length>0){
+    await sb.from('bookings').insert(checked.map(c=>({
+      tee_time_id:tt.id,
+      player_name:c.value,
+      player_init:c.dataset.init,
+      player_color:c.dataset.color,
+    })));
+  }
+
+  btn.disabled=false; btn.textContent='Post Tee Time';
+  closeAddModal();
+  document.getElementById('mDate').value='';
+  document.getElementById('mTime').value='';
+  document.querySelectorAll('#addChecks input').forEach(i=>i.checked=false);
+
+  // Jump to correct week
+  const d=new Date(dateVal+'T12:00:00');
+  let w=0;
+  for(let i=-52;i<=52;i++){
+    const s=new Date(TODAY); s.setDate(s.getDate()+i*7);
+    const e=new Date(s); e.setDate(e.getDate()+6);
+    if(d>=s&&d<=e){ w=i; break; }
+  }
+  weekOffset=w; selectedDate=d;
+  await loadWeatherForWeek();
+  showToast(`TEE TIME POSTED — ${course.split(' ')[0].toUpperCase()}`);
+}
+
+// ── My Spots ──
+function openMySpots(){
+  const el=document.getElementById('spotsContent');
+  const entries=Object.entries(mySpots);
+  el.innerHTML=entries.length===0
+    ?'<p class="empty-spots">No spots claimed this session. Get in the mix!</p>'
+    :entries.map(([name,spots])=>`
+      <div style="margin-bottom:1.2rem;">
+        <div style="font-family:var(--font-display);font-size:0.95rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--lime);margin-bottom:0.5rem;">${name}</div>
+        ${spots.map(s=>`<div class="spot-item">
+          <div class="spot-course">${s.course}</div>
+          <div class="spot-meta">${s.date} · ${s.time}</div>
+          <a href="${s.bookUrl}" target="_blank" class="spot-book">⛳ Complete Booking ↗</a>
+        </div>`).join('')}
+      </div>`).join('');
+  document.getElementById('spotsModal').classList.add('open');
+}
+function closeSpotsModal(){ document.getElementById('spotsModal').classList.remove('open'); }
+
+// ── MCG Toggle ──
+function toggleMCG(){
+  document.getElementById('mcgCourses').classList.toggle('open');
+  document.getElementById('mcgToggle').classList.toggle('open');
+}
+
+// ── Toast ──
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.innerHTML=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),4000);
+}
+
+// Close on backdrop
+['addModal','claimModal','spotsModal'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); });
+});
+
+// ── Boot ──
+loadAll();
+subscribeRealtime();
+</script>
+</body>
+</html>
