@@ -181,6 +181,13 @@ header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop
 .crew-stat{font-family:var(--font-display);font-size:0.55rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;flex-shrink:0;padding:0.12rem 0.4rem;}
 .st-in{background:rgba(198,241,53,0.12);color:var(--lime);} .st-avail{color:var(--muted);}
 .hdcp-note{font-family:var(--font-display);font-size:0.55rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);opacity:0.5;margin-top:0.7rem;}
+.crew-remove{background:none;border:none;color:rgba(255,255,255,0.15);font-size:0.7rem;cursor:pointer;padding:0.15rem 0.3rem;transition:color 0.15s;font-family:var(--font-display);font-weight:700;line-height:1;}
+.crew-remove:hover{color:var(--red);}
+.add-player-btn{display:flex;align-items:center;justify-content:center;gap:0.5rem;width:100%;padding:0.55rem 0.6rem;background:transparent;border:1px dashed rgba(255,255,255,0.15);color:var(--muted);font-family:var(--font-display);font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;margin-top:0.5rem;}
+.add-player-btn:hover{border-color:var(--lime);color:var(--lime);background:var(--lime-dim);}
+.color-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:0.35rem;margin-top:0.3rem;}
+.color-swatch{width:100%;aspect-ratio:1;border:2px solid transparent;cursor:pointer;transition:all 0.15s;}
+.color-swatch.selected{border-color:var(--white);transform:scale(1.15);}
 
 /* MODALS */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center;}
@@ -331,9 +338,10 @@ header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop
     </div>
 
     <div class="sb-section">
-      <div class="sec-label">The Veggies <span class="pill">10</span></div>
+      <div class="sec-label">The Veggies <span class="pill" id="crewCount">10</span></div>
       <div id="crewList"></div>
       <div class="hdcp-note">USGA Handicap Index</div>
+      <button class="add-player-btn" onclick="openAddPlayerModal()">+ Add a Veggie</button>
     </div>
   </div>
 </div>
@@ -409,6 +417,29 @@ header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop
   </div>
 </div>
 
+<!-- ADD PLAYER MODAL -->
+<div class="overlay" id="addPlayerModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>Add a <em>Veggie</em></h2><p class="modal-sub">New player joins the crew</p></div>
+      <button class="modal-close" onclick="closeAddPlayerModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label>Full Name</label><input type="text" id="pName" placeholder="e.g. John Smith"></div>
+      <div class="fg"><label>Initials (2 letters)</label><input type="text" id="pInitials" placeholder="e.g. JS" maxlength="2"></div>
+      <div class="fg"><label>Handicap Index</label><input type="number" id="pHdcp" placeholder="e.g. 12.4" step="0.1" min="0" max="54"></div>
+      <div class="fg">
+        <label>Avatar Color</label>
+        <div class="color-grid" id="colorGrid"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-dark" onclick="closeAddPlayerModal()">Cancel</button>
+        <button class="btn btn-lime" id="addPlayerBtn" onclick="submitAddPlayer()">Add Veggie</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -419,19 +450,14 @@ const sb = createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5waGN0ZXh3eGhneWx2bnR3ZG9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NDc0NjgsImV4cCI6MjA5MDEyMzQ2OH0.h7FmoQrpQiXWvfwjJXwcXb-3f5o-ZSCUCW0f4dhw4CQ'
 );
 
-// ── Crew ──
-const CREW = [
-  {name:"Joe Howley",     init:"JH",hdcp:10.8,color:"#c6f135"},
-  {name:"Philip Dao",     init:"PD",hdcp:22.1,color:"#6aaa7e"},
-  {name:"CJ Kozorosky",   init:"CJ",hdcp:15.1,color:"#4a9eff"},
-  {name:"Joe Reilly",     init:"JR",hdcp: 0.9,color:"#b388ff"},
-  {name:"Mike Rosenbaum", init:"MR",hdcp: 9.1,color:"#ff8a65"},
-  {name:"Jack Sebeck",    init:"JS",hdcp: 8.5,color:"#4dd0e1"},
-  {name:"Tristan Sinha",  init:"TS",hdcp:12.3,color:"#ffcc02"},
-  {name:"Steve Stanislav",init:"SS",hdcp: 6.8,color:"#a5d6a7"},
-  {name:"Kyle Turner",    init:"KT",hdcp:14.7,color:"#ef9a9a"},
-  {name:"Casey Weiskoph", init:"CW",hdcp:10.5,color:"#80cbc4"},
+const AVATAR_COLORS = [
+  '#c6f135','#4a9eff','#ff8a65','#b388ff','#4dd0e1',
+  '#ffcc02','#a5d6a7','#ef9a9a','#80cbc4','#6aaa7e',
+  '#f48fb1','#fff176','#bcaaa4','#ce93d8','#90caf9',
+  '#ffab91',
 ];
+
+let selectedColor = AVATAR_COLORS[0];
 
 const COURSE_URLS = {
   "Falls Road (MCG)":"https://fox.tenfore.golf/mcggolf",
@@ -454,21 +480,22 @@ const TODAY = new Date(); TODAY.setHours(0,0,0,0);
 let weekOffset = 0;
 let selectedDate = null;
 
-// Local cache of db data
-let dbTeeTimes = [];   // [{id, course, date, time_window, format, book_url}]
-let dbBookings = [];   // [{id, tee_time_id, player_name, player_init, player_color}]
-let dbWeather  = {};   // {date_key: {icon,temp,description,demand_class,demand_label}}
-let mySpots    = {};   // session-only: name -> [{...}]
+// Live data
+let CREW       = [];   // from players table
+let dbTeeTimes = [];
+let dbBookings = [];
+let dbWeather  = {};
+let mySpots    = {};
 
 function dateKey(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
-function parseDate(str){ const d=new Date(str+'T12:00:00'); return d; }
+function parseDate(str){ return new Date(str+'T12:00:00'); }
 function short(n){ const p=n.split(' '); return p[0]+' '+p[1].charAt(0)+'.'; }
 function av(init,color,size=15){
   return `<span style="width:${size}px;height:${size}px;background:${color};display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:${Math.round(size*0.38)}px;font-weight:800;color:#0a0a0a;flex-shrink:0;">${init}</span>`;
 }
 
-// ── Weather (seeded deterministic fallback + cache) ──
+// ── Weather ──
 function weatherFallback(dk){
   let h=0; for(let c of dk) h=(h*31+c.charCodeAt(0))&0xffff;
   const opts=[
@@ -481,22 +508,17 @@ function weatherFallback(dk){
   ];
   return opts[h%opts.length];
 }
-
-function getWeather(dk){ return dbWeather[dk] || weatherFallback(dk); }
+function getWeather(dk){ return dbWeather[dk]||weatherFallback(dk); }
 
 async function loadWeatherForWeek(){
-  const ws = weekStart();
-  const keys = [];
+  const ws=weekStart();
+  const keys=[];
   for(let i=0;i<7;i++){ const d=new Date(ws); d.setDate(ws.getDate()+i); keys.push(dateKey(d)); }
-  const missing = keys.filter(k=>!dbWeather[k]);
+  const missing=keys.filter(k=>!dbWeather[k]);
   if(missing.length===0) return;
-
-  // Try to load from cache table
-  const {data} = await sb.from('weather_cache').select('*').in('date_key',missing);
+  const {data}=await sb.from('weather_cache').select('*').in('date_key',missing);
   if(data) data.forEach(row=>{ dbWeather[row.date_key]=row; });
-
-  // For any still missing, write fallback to cache
-  const stillMissing = missing.filter(k=>!dbWeather[k]);
+  const stillMissing=missing.filter(k=>!dbWeather[k]);
   for(const k of stillMissing){
     const w=weatherFallback(k);
     dbWeather[k]=w;
@@ -508,24 +530,24 @@ async function loadWeatherForWeek(){
 async function loadAll(){
   setConnStatus('loading');
   try {
-    const [{data:tt,error:e1},{data:bk,error:e2}] = await Promise.all([
+    const [{data:pl,error:e0},{data:tt,error:e1},{data:bk,error:e2}]=await Promise.all([
+      sb.from('players').select('*').order('name'),
       sb.from('tee_times').select('*').order('date').order('time_window'),
       sb.from('bookings').select('*'),
     ]);
-    if(e1||e2) throw new Error(e1?.message||e2?.message);
-    dbTeeTimes = tt||[];
-    dbBookings = bk||[];
+    if(e0||e1||e2) throw new Error(e0?.message||e1?.message||e2?.message);
+    CREW=pl||[];
+    dbTeeTimes=tt||[];
+    dbBookings=bk||[];
     await loadWeatherForWeek();
     setConnStatus('live');
+    renderCrew();
     renderCal();
     renderFeed();
-    renderCrew();
+    buildAddChecks();
   } catch(err){
     setConnStatus('error');
     showToast('DB ERROR: '+err.message);
-    renderCal();
-    renderFeed();
-    renderCrew();
   }
 }
 
@@ -534,14 +556,15 @@ function setConnStatus(s){
   dot.className='conn-dot';
   if(s==='live') dot.classList.add('live');
   if(s==='error') dot.classList.add('error');
-  dot.title = s==='live'?'Live — real-time sync on':s==='error'?'Connection error':'Connecting...';
+  dot.title=s==='live'?'Live — real-time sync on':s==='error'?'Connection error':'Connecting...';
 }
 
-// ── Real-time subscriptions ──
+// ── Real-time ──
 function subscribeRealtime(){
   sb.channel('veggie-realtime')
     .on('postgres_changes',{event:'*',schema:'public',table:'tee_times'},async()=>{ await reloadData(); })
     .on('postgres_changes',{event:'*',schema:'public',table:'bookings'}, async()=>{ await reloadData(); })
+    .on('postgres_changes',{event:'*',schema:'public',table:'players'},  async()=>{ await reloadData(); })
     .subscribe(status=>{
       if(status==='SUBSCRIBED') setConnStatus('live');
       if(status==='CHANNEL_ERROR') setConnStatus('error');
@@ -549,41 +572,102 @@ function subscribeRealtime(){
 }
 
 async function reloadData(){
-  const [{data:tt},{data:bk}] = await Promise.all([
+  const [{data:pl},{data:tt},{data:bk}]=await Promise.all([
+    sb.from('players').select('*').order('name'),
     sb.from('tee_times').select('*').order('date').order('time_window'),
     sb.from('bookings').select('*'),
   ]);
+  CREW=pl||[];
   dbTeeTimes=tt||[];
   dbBookings=bk||[];
+  renderCrew();
   renderCal();
   renderFeed();
-  renderCrew();
+  buildAddChecks();
 }
 
-// ── Helpers ──
 function bookingsFor(ttId){ return dbBookings.filter(b=>b.tee_time_id===ttId); }
 function openSlotsFor(ttId){ return 4-bookingsFor(ttId).length; }
 
 // ── Render Crew ──
 function renderCrew(){
+  const count=CREW.length;
+  const countEl=document.getElementById('crewCount');
+  if(countEl) countEl.textContent=count;
+
   document.getElementById('crewList').innerHTML = CREW.map(p=>{
-    const cnt = dbBookings.filter(b=>b.player_init===p.init).length;
+    const cnt=dbBookings.filter(b=>b.player_init===p.initials).length;
     return `<div class="crew-row">
-      <div class="crew-av" style="background:${p.color};">${p.init}</div>
+      <div class="crew-av" style="background:${p.color};">${p.initials}</div>
       <span class="crew-name">${p.name}</span>
-      <span class="crew-hdcp">${p.hdcp}</span>
+      <span class="crew-hdcp">${p.handicap}</span>
       <span class="crew-stat ${cnt>0?'st-in':'st-avail'}">${cnt>0?`In ${cnt}`:'Open'}</span>
+      <button class="crew-remove" onclick="removePlayer('${p.id}','${p.name}')" title="Remove player">✕</button>
     </div>`;
   }).join('');
 }
 
-// ── Player checks ──
-document.getElementById('addChecks').innerHTML = CREW.map(p=>
-  `<label class="p-check">
-    <input type="checkbox" value="${p.name}" data-init="${p.init}" data-color="${p.color}">
-    <span class="p-check-name">${p.name.split(' ')[0]}</span>
-    <span class="p-check-hdcp">${p.hdcp}</span>
-  </label>`).join('');
+// ── Build player checkboxes in Add Time modal ──
+function buildAddChecks(){
+  document.getElementById('addChecks').innerHTML = CREW.map(p=>
+    `<label class="p-check">
+      <input type="checkbox" value="${p.name}" data-init="${p.initials}" data-color="${p.color}">
+      <span class="p-check-name">${p.name.split(' ')[0]}</span>
+      <span class="p-check-hdcp">${p.handicap}</span>
+    </label>`).join('');
+}
+
+// ── Add Player Modal ──
+function buildColorGrid(){
+  document.getElementById('colorGrid').innerHTML = AVATAR_COLORS.map(c=>
+    `<div class="color-swatch${c===selectedColor?' selected':''}" style="background:${c};" onclick="selectColor('${c}')"></div>`
+  ).join('');
+}
+
+function selectColor(c){
+  selectedColor=c;
+  buildColorGrid();
+}
+
+function openAddPlayerModal(){
+  selectedColor=AVATAR_COLORS[0];
+  document.getElementById('pName').value='';
+  document.getElementById('pInitials').value='';
+  document.getElementById('pHdcp').value='';
+  buildColorGrid();
+  document.getElementById('addPlayerModal').classList.add('open');
+}
+function closeAddPlayerModal(){ document.getElementById('addPlayerModal').classList.remove('open'); }
+
+async function submitAddPlayer(){
+  const name=document.getElementById('pName').value.trim();
+  const initials=document.getElementById('pInitials').value.trim().toUpperCase();
+  const hdcp=parseFloat(document.getElementById('pHdcp').value)||0;
+
+  if(!name||!initials){ showToast('FILL IN NAME & INITIALS'); return; }
+  if(initials.length!==2){ showToast('INITIALS MUST BE 2 LETTERS'); return; }
+
+  const btn=document.getElementById('addPlayerBtn');
+  btn.disabled=true; btn.textContent='Adding...';
+
+  const {error}=await sb.from('players').insert({
+    name, initials, handicap:hdcp, color:selectedColor
+  });
+
+  btn.disabled=false; btn.textContent='Add Veggie';
+  if(error){ showToast('ERROR: '+error.message); return; }
+
+  closeAddPlayerModal();
+  showToast(`${name.split(' ')[0].toUpperCase()} JOINED THE VEGGIES`);
+}
+
+// ── Remove Player ──
+async function removePlayer(id, name){
+  if(!confirm(`Remove ${name} from the Veggies?`)) return;
+  const {error}=await sb.from('players').delete().eq('id',id);
+  if(error){ showToast('ERROR: '+error.message); return; }
+  showToast(`${name.split(' ')[0].toUpperCase()} REMOVED`);
+}
 
 // ── Calendar ──
 function weekStart(){ const d=new Date(TODAY); d.setDate(d.getDate()+weekOffset*7); return d; }
@@ -608,7 +692,7 @@ function renderCal(){
     const dayTimes=dbTeeTimes.filter(t=>t.date===dk);
     let dots='';
     if(dayTimes.length===0){ dots=`<div class="cal-dot dot-none"></div>`; }
-    else { dayTimes.forEach(t=>{ dots+=`<div class="cal-dot ${openSlotsFor(t.id)===0?'dot-full':'dot-open'}"></div>`; }); }
+    else{ dayTimes.forEach(t=>{ dots+=`<div class="cal-dot ${openSlotsFor(t.id)===0?'dot-full':'dot-open'}"></div>`; }); }
     const cell=document.createElement('div');
     cell.className='cal-cell'+(isToday?' today':'')+(isActive?' active':'');
     cell.innerHTML=`${isToday?'<div class="today-pip"></div>':''}
@@ -639,7 +723,6 @@ function renderFeed(){
   const ws=weekStart();
   const we=new Date(ws); we.setDate(we.getDate()+6);
   const wsKey=dateKey(ws), weKey=dateKey(we);
-
   let filtered;
   if(selectedDate){
     const dk=dateKey(selectedDate);
@@ -649,7 +732,6 @@ function renderFeed(){
     filtered=dbTeeTimes.filter(t=>t.date>=wsKey&&t.date<=weKey);
     label.textContent='This Week';
   }
-
   if(filtered.length===0){
     list.innerHTML=`<div class="empty-state">
       <div class="empty-big">No Times<br>Posted</div>
@@ -667,13 +749,11 @@ function buildCard(t){
   const bks=bookingsFor(t.id);
   const open=4-bks.length;
   const isHot=w.demand_class==='d-hot'&&open>0;
-
   const takenH=bks.map(b=>`<div class="slot slot-taken">${av(b.player_init,b.player_color,14)} ${short(b.player_name)}</div>`).join('');
   const openH=Array(open).fill(0).map(()=>`<div class="slot slot-open" onclick="openClaim('${t.id}')">+ Claim</div>`).join('');
   const fullLbl=open===0
     ?'<span style="color:var(--muted);font-family:var(--font-display);font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">Fully Booked</span>'
     :`<strong>${open} Spot${open!==1?'s':''}</strong> Open`;
-
   return `<div class="tee-card${isHot?' hot':''}">
     ${isHot?'<div class="hot-flag">🔥 Hot</div>':''}
     <div class="card-top">
@@ -708,7 +788,6 @@ function buildCard(t){
   </div>`;
 }
 
-// ── Delete tee time ──
 async function deleteTeeTime(id){
   if(!confirm('Remove this tee time for everyone?')) return;
   const {error}=await sb.from('tee_times').delete().eq('id',id);
@@ -722,12 +801,12 @@ function openClaim(id){
   claimTeeId=id;
   const bks=bookingsFor(id);
   const takenInits=new Set(bks.map(b=>b.player_init));
-  const avail=CREW.filter(p=>!takenInits.has(p.init));
+  const avail=CREW.filter(p=>!takenInits.has(p.initials));
   document.getElementById('claimList').innerHTML=avail.length
-    ?avail.map(p=>`<button class="claim-row" onclick="confirmClaim('${p.name}','${p.init}','${p.color}')">
-        <div class="claim-av" style="background:${p.color};">${p.init}</div>
+    ?avail.map(p=>`<button class="claim-row" onclick="confirmClaim('${p.name}','${p.initials}','${p.color}')">
+        <div class="claim-av" style="background:${p.color};">${p.initials}</div>
         ${p.name}
-        <span class="claim-hdcp">Hdcp ${p.hdcp}</span>
+        <span class="claim-hdcp">Hdcp ${p.handicap}</span>
       </button>`).join('')
     :'<p style="font-family:var(--font-display);font-size:0.8rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);">All Veggies booked!</p>';
   document.getElementById('claimModal').classList.add('open');
@@ -738,18 +817,10 @@ async function confirmClaim(name,init,color){
   if(!claimTeeId) return;
   const tt=dbTeeTimes.find(t=>t.id===claimTeeId);
   if(!tt) return;
-
-  const {error}=await sb.from('bookings').insert({
-    tee_time_id:claimTeeId,
-    player_name:name,
-    player_init:init,
-    player_color:color,
-  });
+  const {error}=await sb.from('bookings').insert({tee_time_id:claimTeeId,player_name:name,player_init:init,player_color:color});
   if(error){ showToast('ERROR: '+error.message); return; }
-
   if(!mySpots[name]) mySpots[name]=[];
   mySpots[name].push({course:tt.course,date:tt.date,time:tt.time_window,bookUrl:tt.book_url});
-
   closeClaimModal();
   showToast(`${short(name)} IS IN — <a href="${tt.book_url}" target="_blank">BOOK NOW ↗</a>`);
 }
@@ -766,34 +837,19 @@ async function submitTime(){
   const time=document.getElementById('mTime').value.trim();
   const format=document.getElementById('mFormat').value;
   if(!dateVal||!time){ showToast('FILL IN DATE & TIME'); return; }
-
   const btn=document.getElementById('submitBtn');
   btn.disabled=true; btn.textContent='Posting...';
-
-  const {data:tt,error:e1}=await sb.from('tee_times').insert({
-    course,date:dateVal,time_window:time,format,book_url:bookUrl
-  }).select().single();
-
+  const {data:tt,error:e1}=await sb.from('tee_times').insert({course,date:dateVal,time_window:time,format,book_url:bookUrl}).select().single();
   if(e1){ showToast('ERROR: '+e1.message); btn.disabled=false; btn.textContent='Post Tee Time'; return; }
-
-  // Insert pre-confirmed players
   const checked=[...document.querySelectorAll('#addChecks input:checked')];
   if(checked.length>0){
-    await sb.from('bookings').insert(checked.map(c=>({
-      tee_time_id:tt.id,
-      player_name:c.value,
-      player_init:c.dataset.init,
-      player_color:c.dataset.color,
-    })));
+    await sb.from('bookings').insert(checked.map(c=>({tee_time_id:tt.id,player_name:c.value,player_init:c.dataset.init,player_color:c.dataset.color})));
   }
-
   btn.disabled=false; btn.textContent='Post Tee Time';
   closeAddModal();
   document.getElementById('mDate').value='';
   document.getElementById('mTime').value='';
   document.querySelectorAll('#addChecks input').forEach(i=>i.checked=false);
-
-  // Jump to correct week
   const d=new Date(dateVal+'T12:00:00');
   let w=0;
   for(let i=-52;i<=52;i++){
@@ -839,7 +895,7 @@ function showToast(msg){
 }
 
 // Close on backdrop
-['addModal','claimModal','spotsModal'].forEach(id=>{
+['addModal','claimModal','spotsModal','addPlayerModal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); });
 });
 
