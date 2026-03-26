@@ -177,7 +177,8 @@ header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop
 .crew-row:last-child{border-bottom:none;}
 .crew-av{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:0.62rem;font-weight:800;color:var(--black);flex-shrink:0;}
 .crew-name{font-family:var(--font-display);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--white);flex:1;}
-.crew-hdcp{font-family:var(--font-display);font-size:0.75rem;font-weight:700;color:var(--muted);width:28px;text-align:right;flex-shrink:0;}
+.crew-hdcp{font-family:var(--font-display);font-size:0.75rem;font-weight:700;color:var(--muted);width:28px;text-align:right;flex-shrink:0;transition:color 0.15s;}
+.crew-hdcp:hover{color:var(--lime);}
 .crew-stat{font-family:var(--font-display);font-size:0.55rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;flex-shrink:0;padding:0.12rem 0.4rem;}
 .st-in{background:rgba(198,241,53,0.12);color:var(--lime);} .st-avail{color:var(--muted);}
 .hdcp-note{font-family:var(--font-display);font-size:0.55rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);opacity:0.5;margin-top:0.7rem;}
@@ -428,6 +429,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop
       <div class="fg"><label>Full Name</label><input type="text" id="pName" placeholder="e.g. John Smith"></div>
       <div class="fg"><label>Initials (2 letters)</label><input type="text" id="pInitials" placeholder="e.g. JS" maxlength="2"></div>
       <div class="fg"><label>Handicap Index</label><input type="number" id="pHdcp" placeholder="e.g. 12.4" step="0.1" min="0" max="54"></div>
+      <div class="fg"><label>Email (for notifications)</label><input type="email" id="pEmail" placeholder="e.g. joe@gmail.com"></div>
       <div class="fg">
         <label>Avatar Color</label>
         <div class="color-grid" id="colorGrid"></div>
@@ -471,6 +473,113 @@ const COURSE_URLS = {
   "Sligo Creek (MCG)":"https://fox.tenfore.golf/mcggolf",
   "Blue Mash Golf Course":"https://www.bluemash.com",
 };
+
+const RESEND_KEY = 're_T8d5q6Rw_PY5VTkvXuzRDJwZskj9npZQg';
+const SITE_URL   = 'https://joehowleyins-ctrl.github.io/veggie-tee-grabber';
+
+// ── Send email notifications ──
+async function sendNotification(type, data){
+  try {
+    // Get all crew emails
+    const emails = CREW.map(p=>p.email).filter(e=>e&&e.includes('@'));
+    if(emails.length===0) return;
+
+    let subject='', html='';
+    const siteBtn = `<a href="${SITE_URL}" style="display:inline-block;background:#c6f135;color:#0a0a0a;font-family:sans-serif;font-size:13px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;padding:12px 24px;text-decoration:none;margin-top:20px;">Open App →</a>`;
+
+    if(type==='new_tee_time'){
+      subject = `⛳ New Tee Time — ${data.course}`;
+      html = `
+        <div style="background:#0a0a0a;padding:32px;font-family:sans-serif;max-width:480px;margin:0 auto;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#c6f135;margin-bottom:8px;">Veggie Tee Time Grabber</div>
+          <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;color:#ffffff;margin:0 0 4px;">New Tee Time Posted</h1>
+          <div style="height:2px;background:#c6f135;width:48px;margin-bottom:24px;"></div>
+          <div style="background:#161616;border:1px solid rgba(255,255,255,0.08);padding:20px;margin-bottom:16px;">
+            <div style="font-size:20px;font-weight:800;text-transform:uppercase;color:#ffffff;margin-bottom:8px;">${data.course}</div>
+            <div style="font-size:13px;color:#c6f135;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;background:rgba(198,241,53,0.1);display:inline-block;padding:4px 10px;margin-bottom:8px;">${data.time_window}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;">${data.date} · ${data.format}</div>
+          </div>
+          <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;">Posted by</div>
+          <div style="font-size:16px;font-weight:700;color:#ffffff;">${data.postedBy||'A Veggie'}</div>
+          ${siteBtn}
+          <div style="margin-top:24px;font-size:11px;color:rgba(255,255,255,0.2);text-transform:uppercase;letter-spacing:0.1em;">First come, first serve — claim your spot now</div>
+        </div>`;
+    }
+
+    if(type==='spot_claimed'){
+      subject = `👤 ${data.playerName} claimed a spot — ${data.course}`;
+      html = `
+        <div style="background:#0a0a0a;padding:32px;font-family:sans-serif;max-width:480px;margin:0 auto;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#c6f135;margin-bottom:8px;">Veggie Tee Time Grabber</div>
+          <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;color:#ffffff;margin:0 0 4px;">Spot Claimed</h1>
+          <div style="height:2px;background:#c6f135;width:48px;margin-bottom:24px;"></div>
+          <div style="background:#161616;border:1px solid rgba(255,255,255,0.08);padding:20px;margin-bottom:16px;">
+            <div style="font-size:20px;font-weight:800;text-transform:uppercase;color:#c6f135;margin-bottom:4px;">${data.playerName}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">just claimed a spot at</div>
+            <div style="font-size:18px;font-weight:800;text-transform:uppercase;color:#ffffff;margin-top:8px;">${data.course}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.5);margin-top:4px;text-transform:uppercase;letter-spacing:0.08em;">${data.date} · ${data.time}</div>
+          </div>
+          <div style="font-size:13px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.08em;">${data.openSlots} spot${data.openSlots!==1?'s':''} remaining</div>
+          ${siteBtn}
+        </div>`;
+    }
+
+    if(type==='tee_time_deleted'){
+      subject = `❌ Tee Time Cancelled — ${data.course}`;
+      html = `
+        <div style="background:#0a0a0a;padding:32px;font-family:sans-serif;max-width:480px;margin:0 auto;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#c6f135;margin-bottom:8px;">Veggie Tee Time Grabber</div>
+          <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;color:#ff3b3b;margin:0 0 4px;">Tee Time Cancelled</h1>
+          <div style="height:2px;background:#ff3b3b;width:48px;margin-bottom:24px;"></div>
+          <div style="background:#161616;border:1px solid rgba(255,255,255,0.08);padding:20px;">
+            <div style="font-size:20px;font-weight:800;text-transform:uppercase;color:#ffffff;margin-bottom:8px;">${data.course}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">${data.date} · ${data.time}</div>
+          </div>
+          <div style="margin-top:16px;font-size:13px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:0.08em;">This tee time has been removed</div>
+          ${siteBtn}
+        </div>`;
+    }
+
+    if(type==='spot_opened'){
+      subject = `🔓 Spot Just Opened — ${data.course}`;
+      html = `
+        <div style="background:#0a0a0a;padding:32px;font-family:sans-serif;max-width:480px;margin:0 auto;">
+          <div style="font-size:11px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#c6f135;margin-bottom:8px;">Veggie Tee Time Grabber</div>
+          <h1 style="font-size:28px;font-weight:900;text-transform:uppercase;color:#ffffff;margin:0 0 4px;">Spot Opened Up</h1>
+          <div style="height:2px;background:#c6f135;width:48px;margin-bottom:24px;"></div>
+          <div style="background:#161616;border:1px solid rgba(255,255,255,0.08);padding:20px;margin-bottom:16px;">
+            <div style="font-size:20px;font-weight:800;text-transform:uppercase;color:#ffffff;margin-bottom:8px;">${data.course}</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.5);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;">${data.date} · ${data.time}</div>
+          </div>
+          <div style="font-size:15px;color:#c6f135;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;">A spot just freed up — grab it!</div>
+          ${siteBtn}
+        </div>`;
+    }
+
+    // Send to all emails with addresses
+    await Promise.all(emails.map(email =>
+      fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Veggie Tee Grabber <onboarding@resend.dev>',
+          to: [email],
+          subject,
+          html,
+        }),
+      })
+    ));
+
+    // Log it
+    await sb.from('notifications_log').insert({ type, message: subject });
+
+  } catch(err){
+    console.error('Notification error:', err);
+  }
+}
 
 const DAYS  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONS  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -600,11 +709,22 @@ function renderCrew(){
     return `<div class="crew-row">
       <div class="crew-av" style="background:${p.color};">${p.initials}</div>
       <span class="crew-name">${p.name}</span>
-      <span class="crew-hdcp">${p.handicap}</span>
+      <span class="crew-hdcp" id="hdcp-${p.id}" style="cursor:pointer;" onclick="editHandicap('${p.id}','${p.name}',${p.handicap})" title="Tap to edit handicap">${p.handicap}</span>
       <span class="crew-stat ${cnt>0?'st-in':'st-avail'}">${cnt>0?`In ${cnt}`:'Open'}</span>
       <button class="crew-remove" onclick="removePlayer('${p.id}','${p.name}')" title="Remove player">✕</button>
     </div>`;
   }).join('');
+}
+
+// ── Edit Handicap ──
+async function editHandicap(id, name, current){
+  const input = prompt(`Update GHIN handicap for ${name}:`, current);
+  if(input===null) return; // cancelled
+  const val = parseFloat(input);
+  if(isNaN(val)||val<0||val>54){ showToast('ENTER A VALID HANDICAP (0–54)'); return; }
+  const {error}=await sb.from('players').update({handicap:val}).eq('id',id);
+  if(error){ showToast('ERROR: '+error.message); return; }
+  showToast(`${name.split(' ')[0].toUpperCase()} UPDATED TO ${val}`);
 }
 
 // ── Build player checkboxes in Add Time modal ──
@@ -643,6 +763,7 @@ async function submitAddPlayer(){
   const name=document.getElementById('pName').value.trim();
   const initials=document.getElementById('pInitials').value.trim().toUpperCase();
   const hdcp=parseFloat(document.getElementById('pHdcp').value)||0;
+  const email=document.getElementById('pEmail').value.trim();
 
   if(!name||!initials){ showToast('FILL IN NAME & INITIALS'); return; }
   if(initials.length!==2){ showToast('INITIALS MUST BE 2 LETTERS'); return; }
@@ -651,7 +772,8 @@ async function submitAddPlayer(){
   btn.disabled=true; btn.textContent='Adding...';
 
   const {error}=await sb.from('players').insert({
-    name, initials, handicap:hdcp, color:selectedColor
+    name, initials, handicap:hdcp, color:selectedColor,
+    email: email||null,
   });
 
   btn.disabled=false; btn.textContent='Add Veggie';
@@ -790,9 +912,13 @@ function buildCard(t){
 
 async function deleteTeeTime(id){
   if(!confirm('Remove this tee time for everyone?')) return;
+  const tt=dbTeeTimes.find(t=>t.id===id);
   const {error}=await sb.from('tee_times').delete().eq('id',id);
   if(error){ showToast('ERROR: '+error.message); return; }
   showToast('TEE TIME REMOVED');
+  if(tt) sendNotification('tee_time_deleted',{
+    course:tt.course, date:tt.date, time:tt.time_window,
+  });
 }
 
 // ── Claim ──
@@ -823,6 +949,14 @@ async function confirmClaim(name,init,color){
   mySpots[name].push({course:tt.course,date:tt.date,time:tt.time_window,bookUrl:tt.book_url});
   closeClaimModal();
   showToast(`${short(name)} IS IN — <a href="${tt.book_url}" target="_blank">BOOK NOW ↗</a>`);
+
+  // Send notification
+  const openAfter = openSlotsFor(tt.id);
+  sendNotification('spot_claimed',{
+    playerName:name, course:tt.course,
+    date:tt.date, time:tt.time_window,
+    openSlots: openAfter,
+  });
 }
 
 // ── Add tee time ──
@@ -860,6 +994,12 @@ async function submitTime(){
   weekOffset=w; selectedDate=d;
   await loadWeatherForWeek();
   showToast(`TEE TIME POSTED — ${course.split(' ')[0].toUpperCase()}`);
+
+  // Send notification
+  sendNotification('new_tee_time',{
+    course, date:dateVal, time_window:time, format,
+    postedBy: CREW.length>0 ? CREW[0].name : 'A Veggie',
+  });
 }
 
 // ── My Spots ──
