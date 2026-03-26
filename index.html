@@ -276,6 +276,7 @@ header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop
   </div>
   <div class="header-right">
     <div class="conn-dot" id="connDot" title="Database connection"></div>
+    <button class="btn btn-ghost" onclick="openProfile()">My Profile</button>
     <button class="btn btn-ghost" onclick="openAddModal()">+ Post Time</button>
     <button class="btn btn-lime"  onclick="openMySpots()">My Spots</button>
   </div>
@@ -437,6 +438,33 @@ header{position:sticky;top:0;z-index:100;background:rgba(10,10,10,0.92);backdrop
       <div class="modal-foot">
         <button class="btn btn-dark" onclick="closeAddPlayerModal()">Cancel</button>
         <button class="btn btn-lime" id="addPlayerBtn" onclick="submitAddPlayer()">Add Veggie</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MY PROFILE MODAL -->
+<div class="overlay" id="profileModal">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h2>My <em>Profile</em></h2><p class="modal-sub">Set your email to get notifications</p></div>
+      <button class="modal-close" onclick="closeProfile()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg">
+        <label>Who are you?</label>
+        <select id="profilePlayer">
+          <option value="">— Select your name —</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Your Email</label>
+        <input type="email" id="profileEmail" placeholder="e.g. joe@gmail.com">
+      </div>
+      <p style="font-family:var(--font-display);font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;">You'll get notified when tee times are posted, claimed, or cancelled.</p>
+      <div class="modal-foot">
+        <button class="btn btn-dark" onclick="closeProfile()">Cancel</button>
+        <button class="btn btn-lime" id="saveProfileBtn" onclick="saveProfile()">Save</button>
       </div>
     </div>
   </div>
@@ -1034,8 +1062,38 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),4000);
 }
 
+// ── My Profile ──
+function openProfile(){
+  const sel = document.getElementById('profilePlayer');
+  sel.innerHTML = '<option value="">— Select your name —</option>' +
+    CREW.map(p=>`<option value="${p.id}" data-email="${p.email||''}">${p.name}</option>`).join('');
+  sel.onchange = function(){
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('profileEmail').value = opt.dataset.email||'';
+  };
+  document.getElementById('profileEmail').value = '';
+  document.getElementById('profileModal').classList.add('open');
+}
+function closeProfile(){ document.getElementById('profileModal').classList.remove('open'); }
+
+async function saveProfile(){
+  const sel   = document.getElementById('profilePlayer');
+  const id    = sel.value;
+  const email = document.getElementById('profileEmail').value.trim();
+  if(!id){ showToast('SELECT YOUR NAME FIRST'); return; }
+  if(!email||!email.includes('@')){ showToast('ENTER A VALID EMAIL'); return; }
+
+  const btn = document.getElementById('saveProfileBtn');
+  btn.disabled=true; btn.textContent='Saving...';
+  const {error} = await sb.from('players').update({email}).eq('id',id);
+  btn.disabled=false; btn.textContent='Save';
+  if(error){ showToast('ERROR: '+error.message); return; }
+  closeProfile();
+  showToast('EMAIL SAVED — YOU\'RE ALL SET FOR NOTIFICATIONS');
+}
+
 // Close on backdrop
-['addModal','claimModal','spotsModal','addPlayerModal'].forEach(id=>{
+['addModal','claimModal','spotsModal','addPlayerModal','profileModal'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){ if(e.target===this) this.classList.remove('open'); });
 });
 
