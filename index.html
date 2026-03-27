@@ -840,29 +840,47 @@ async function loadAll(){
   }catch(err){setConnStatus('error');showToast('DB ERROR: '+err.message);}
 }
 
-async function reloadData(){
-  const[{data:pl},{data:tt},{data:bk},{data:rd},{data:sc},{data:bt},{data:bp}]=await Promise.all([
-    sb.from('players').select('*').order('name'),
-    sb.from('tee_times').select('*').order('date').order('time_window'),
-    sb.from('bookings').select('*'),
-    sb.from('rounds').select('*').order('date',{ascending:false}),
-    sb.from('scorecards').select('*'),
-    sb.from('bets').select('*').order('created_at',{ascending:false}),
-    sb.from('bet_players').select('*'),
+// ── DEBOUNCED RELOAD ──
+let reloadTimer=null;
+function scheduleReload(tables=[]){
+  clearTimeout(reloadTimer);
+  reloadTimer=setTimeout(()=>reloadData(tables),400);
+}
+
+async function reloadData(tables=[]){
+  // Only fetch tables that changed, or all if unspecified
+  const fetchAll=!tables.length;
+  const[
+    {data:pl},{data:tt},{data:bk},{data:rd},{data:sc},{data:bt},{data:bp}
+  ]=await Promise.all([
+    (fetchAll||tables.includes('players'))    ? sb.from('players').select('*').order('name')                        : Promise.resolve({data:CREW}),
+    (fetchAll||tables.includes('tee_times'))  ? sb.from('tee_times').select('*').order('date').order('time_window') : Promise.resolve({data:dbTeeTimes}),
+    (fetchAll||tables.includes('bookings'))   ? sb.from('bookings').select('*')                                     : Promise.resolve({data:dbBookings}),
+    (fetchAll||tables.includes('rounds'))     ? sb.from('rounds').select('*').order('date',{ascending:false})       : Promise.resolve({data:dbRounds}),
+    (fetchAll||tables.includes('scorecards')) ? sb.from('scorecards').select('*')                                   : Promise.resolve({data:dbScorecards}),
+    (fetchAll||tables.includes('bets'))       ? sb.from('bets').select('*').order('created_at',{ascending:false})   : Promise.resolve({data:dbBets}),
+    (fetchAll||tables.includes('bet_players'))? sb.from('bet_players').select('*')                                  : Promise.resolve({data:dbBetPlayers}),
   ]);
   CREW=pl||[];dbTeeTimes=tt||[];dbBookings=bk||[];dbRounds=rd||[];dbScorecards=sc||[];dbBets=bt||[];dbBetPlayers=bp||[];
   if(currentPlayer){currentPlayer=CREW.find(p=>p.id===currentPlayer.id)||currentPlayer;}
-  renderCrew();renderCal();renderFeed();buildAddChecks();buildRoundPlayerChecks();renderRounds();renderBetLedger();renderProfilePage();
+
+  // Only re-render what's affected
+  const affectsHome=fetchAll||tables.some(t=>['tee_times','bookings','players'].includes(t));
+  const affectsRounds=fetchAll||tables.some(t=>['rounds','scorecards','bets','bet_players'].includes(t));
+
+  if(affectsHome){renderCrew();renderCal();renderFeed();buildAddChecks();buildRoundPlayerChecks();}
+  if(affectsRounds){renderRounds();renderBetLedger();}
+  renderProfilePage();
 }
 
 function subscribeRealtime(){
   sb.channel('vg-rt')
-    .on('postgres_changes',{event:'*',schema:'public',table:'tee_times'},async()=>await reloadData())
-    .on('postgres_changes',{event:'*',schema:'public',table:'bookings'},async()=>await reloadData())
-    .on('postgres_changes',{event:'*',schema:'public',table:'players'},async()=>await reloadData())
-    .on('postgres_changes',{event:'*',schema:'public',table:'rounds'},async()=>await reloadData())
-    .on('postgres_changes',{event:'*',schema:'public',table:'scorecards'},async()=>await reloadData())
-    .on('postgres_changes',{event:'*',schema:'public',table:'bets'},async()=>await reloadData())
+    .on('postgres_changes',{event:'*',schema:'public',table:'tee_times'},  ()=>scheduleReload(['tee_times']))
+    .on('postgres_changes',{event:'*',schema:'public',table:'bookings'},   ()=>scheduleReload(['bookings']))
+    .on('postgres_changes',{event:'*',schema:'public',table:'players'},    ()=>scheduleReload(['players']))
+    .on('postgres_changes',{event:'*',schema:'public',table:'rounds'},     ()=>scheduleReload(['rounds','scorecards','bets','bet_players']))
+    .on('postgres_changes',{event:'*',schema:'public',table:'scorecards'}, ()=>scheduleReload(['scorecards']))
+    .on('postgres_changes',{event:'*',schema:'public',table:'bets'},       ()=>scheduleReload(['bets','bet_players']))
     .subscribe(s=>{if(s==='SUBSCRIBED')setConnStatus('live');if(s==='CHANNEL_ERROR')setConnStatus('error');});
 }
 
